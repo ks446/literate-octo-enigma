@@ -1,29 +1,21 @@
 # EditVideo.io — Channel Audit Report Builder
 
-Handoff brief for Claude Code. Paste this whole file as your first message
-in a new Claude Code session (or just let it read `README.md` from the
-project root — it does that automatically), then say what you want done.
-
-## What this is
-
 An internal tool for EditVideo.io's team: fill in a client's monthly
 YouTube stats, CSV export, screenshots, and analysis notes, and it
 generates a branded, print-ready "Channel Audit & Strategy Report" —
-matching a specific existing report template (maroon background, bold
-rounded cover title, serif client name, dark stat table, narrative-style
-analysis pages).
+matching a specific existing report template (deep indigo background,
+bold rounded cover title, serif client name, dark stat table,
+narrative-style analysis pages).
 
 **Audience:** internal team members, not clients directly. They fill in
 the form and export/send the resulting report.
 
 ## Current state
 
-Right now this is **one single-file HTML app** (`index.html`) built to run
-as a Claude.ai artifact. No build step, no backend, no dependencies beyond
-two CDN includes. It works today by opening the file directly in a
-browser.
+Static HTML app (`index.html`) + one Vercel serverless function
+(`api/ai-assist.js`). No build step, no database, no user accounts.
 
-### What's already built and working (keep this behavior):
+### What's built and working:
 - **Cover page** — agency name/logo, year/period, report title, client name
 - **Executive summary** — free-text narrative, centered
 - **Top videos table** — CSV import (via PapaParse, auto-maps common
@@ -39,75 +31,124 @@ browser.
   Improvement" page, and an "Actionable Next Steps" page — only rendering
   pages that have content.
 - **Branding tab** — agency name, logo upload, background/text/table
-  colors, all applied live to the report preview
+  colors, all applied live to the report preview. Defaults are sampled
+  from editvideo.io's real brand palette (deep indigo `#1B0E3D` /
+  off-white `#F4F1FA` / near-black-indigo table `#120A28`) but are fully
+  overridable per report — see "Theme colors" below.
 - **Export** — `window.print()` with print-specific CSS that hides the
   editor and paginates each `.report-page` as one printed page (user picks
   "Save as PDF" in the browser print dialog)
 - **Image handling** — uploads are downscaled client-side via canvas
   before being stored, to keep things light
+- **Save & team access** — no login, no server-side storage. "Export
+  report as .json" downloads the current report; "Import .json" loads one
+  back in (here or on a teammate's machine). Share the file via
+  Drive/Dropbox/Slack — whatever the team already uses.
+- **AI assist** (Gemini, server-side) — see below.
 
-### What needs to change for a real deployment (this is the actual task):
+## Theme colors
 
-**⚠️ Critical: `window.storage` will not work outside claude.ai.**
-The "Save & team access" tab currently calls `window.storage.get/set/
-delete/list` — this is a Claude-artifact-only API injected by the claude.ai
-runtime. It does not exist in a normal browser or on any standalone host.
-That whole block (search for `// NOTE FOR DEPLOYMENT` in `index.html`)
-needs to be replaced with a real persistence layer before this ships.
+The report's default colors (`state.branding.bg` / `.text` / `.tableBg`)
+are plain hex strings set once in the JS `state` object and mirrored in
+the three color pickers on the Branding tab — there's no separate "theme
+variable" file to edit. To change the default palette permanently, update
+the three hex values in `index.html`:
+- `state.branding` initializer (search for `branding:{`)
+- the three `<input type="color" ...>` defaults on the Branding panel
+- the three fallback values in `hydrateForm()`
 
-Recommended options, roughly in order of setup effort:
-1. **Vercel KV / Upstash Redis** — simplest if deploying to Vercel, minimal
-   backend code, good fit for "save/load a handful of client reports by
-   key" which is exactly the current data shape.
-2. **Supabase** (Postgres + auth) — more setup, but gives you real user
-   accounts/auth for free if the team wants login-gated access rather than
-   just an unlisted URL.
-3. **A tiny custom backend** (e.g. a single Vercel/Netlify serverless
-   function backed by a JSON blob store or SQLite/Turso) — fine if you
-   want to keep it minimal and don't need accounts.
-4. **Skip persistence entirely, ship client-side only** — replace "Save/
-   Load" with "Export report data as .json" / "Import .json" buttons.
-   Team members save the JSON file themselves (e.g. in a shared Drive
-   folder) and re-upload it to keep editing. Zero backend, but no shared
-   "list of saved clients" view.
+Anyone using the app can override colors per-report from the Branding tab
+without touching code — those overrides live in the exported `.json` file,
+not in `index.html`.
 
-Ask the user which of these fits before picking one — it changes the
-project structure a lot (static site vs. site + serverless functions vs.
-site + database).
+## AI assist
+
+Three lightweight AI-assist features, all backed by a single serverless
+function (`api/ai-assist.js`) that calls the **Gemini API** server-side.
+The API key never reaches the browser.
+
+- **✨ Suggest recommendations** (Notables & recs tab) — sends the
+  summary, video metrics, and notables to Gemini, gets back 3–5 draft
+  recommendations in the same "Label: detail" convention as the rest of
+  the report. Each draft is editable and individually checkable before
+  you add the selected ones to the Recommendations field.
+- **✨ Improve this summary** (Exec summary tab) — sends the current
+  draft to Gemini for a tightened rewrite (same facts/numbers, tighter
+  prose). Shown as an editable preview with "Use this version" /
+  "Discard" — never overwrites your draft silently.
+- **🔎 What am I missing?** (top bar) — runs an instant local check for
+  empty/thin sections (no videos, no recs, empty analysis sections, etc.)
+  and, in parallel, asks Gemini to flag weak or generic content (a
+  summary with no concrete numbers, recommendations that are too vague).
+  Both sets of flags show in one list. Purely advisory — never blocks
+  export.
+
+Model used: `gemini-2.5-flash` by default (override via the `GEMINI_MODEL`
+env var — `gemini-flash-lite-latest` is a good choice if you hit the free
+tier's rate limit often, since it has a higher free-tier cap). The
+function retries on `429`/`503` with exponential backoff (up to 4 retries)
+since the Gemini free tier caps around 15 requests/minute.
+
+## Deploying to Vercel
+
+1. Push this repo to GitHub (or GitLab/Bitbucket) and import it in the
+   [Vercel dashboard](https://vercel.com/new), or run `vercel` from the
+   repo root with the Vercel CLI. No framework preset needed — it's a
+   static `index.html` at the repo root plus one file in `api/`, which
+   Vercel picks up automatically as a serverless function.
+2. **Add the Gemini API key.** In the Vercel dashboard: open the project
+   → **Settings** → **Environment Variables** → add a new variable:
+   - Key: `GEMINI_API_KEY`
+   - Value: your key from [Google AI Studio](https://aistudio.google.com/apikey)
+     (free tier is fine — `gemini-2.5-flash` / `gemini-flash-lite-latest`)
+   - Environment: check all three (Production, Preview, Development)
+   - Save, then **redeploy** (env var changes don't apply to already-built
+     deployments) — Deployments tab → "..." on the latest deployment →
+     Redeploy.
+   Optionally also add `GEMINI_MODEL` the same way if you want to pin a
+   specific model instead of the `gemini-2.5-flash` default.
+3. That's it — no database, no other config. Share the resulting
+   `*.vercel.app` URL (or a custom domain, if you attach one in Settings →
+   Domains) with the team.
+
+### Local development
+
+```
+npm install -g vercel   # once, if you don't have it
+vercel dev
+```
+
+Copy `.env.example` to `.env.local` and fill in `GEMINI_API_KEY` first, so
+the AI-assist endpoints work locally too — `vercel dev` reads
+`.env.local` automatically.
+
+### Login-gating (optional, not set up)
+
+There's no auth. If you want to restrict the URL to the team instead of
+relying on it being unlisted, the simplest option is Vercel's built-in
+[password protection](https://vercel.com/docs/deployment-protection)
+(paid feature on some plans) — no code changes needed. A full accounts
+system (Supabase Auth / Clerk) would be a bigger addition; ask if that's
+wanted.
 
 ## What NOT to change unless asked
 
-- The visual design (colors, fonts, page layout) — it's intentionally
-  matched to an existing report template the team already uses with
-  clients. Don't "improve" the aesthetic unprompted.
+- The visual design (fonts, page layout, print pagination) — it's
+  intentionally matched to an existing report template the team already
+  uses with clients. Don't "improve" the aesthetic unprompted.
 - The print/export mechanism (`window.print()` + print CSS) — this is
   deliberate; don't replace it with a PDF-generation library unless asked.
 - The CSV auto-mapping logic and the "one bullet per line" text convention
   for notables/recommendations/analysis bullets.
 
-## Suggested next steps
+## Files
 
-1. Ask the user which persistence option (above) they want, and whether
-   they need login-gating or just an unlisted/shared URL.
-2. Set up a proper project structure (move `index.html` into `public/` or
-   keep as root static file, depending on host), `git init`, and a
-   `.gitignore`.
-3. Replace the `window.storage` block per the chosen option.
-4. Deploy (Vercel is the path of least resistance for a static site +
-   optional serverless functions — `vercel` CLI, connect a GitHub repo,
-   or drag-and-drop deploy).
-5. Confirm the exported PDF still looks right after deployment (test
-   print-to-PDF in a real browser, not just the artifact preview).
-6. If login-gating is wanted: simplest option is Vercel's built-in
-   password protection (paid feature) or a lightweight Basic Auth
-   middleware; a full auth system (Supabase Auth / Clerk) is the option
-   if they want individual team member accounts.
-
-## Files in this handoff
-
-- `index.html` — the full app (single file, ~690 lines: HTML + CSS + JS).
-  Fonts loaded from Google Fonts CDN, CSV parsing via PapaParse from
-  cdnjs. Both are normal `<link>`/`<script src>` tags and will work fine
-  in a standalone deployment — only `window.storage` is the artifact-only
-  piece.
-- `README.md` — this file.
+- `index.html` — the full app (HTML + CSS + JS, single file). Fonts from
+  Google Fonts CDN, CSV parsing via PapaParse from cdnjs.
+- `api/ai-assist.js` — Vercel serverless function; calls Gemini
+  server-side for the three AI-assist features above.
+- `vercel.json` — sets a 30s timeout on the AI-assist function (covers
+  the worst-case retry/backoff chain).
+- `.env.example` — copy to `.env.local` for local dev.
+- `package.json` — no runtime dependencies; the serverless function uses
+  Node's built-in `fetch`.
