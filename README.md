@@ -83,11 +83,14 @@ The API key never reaches the browser.
   Both sets of flags show in one list. Purely advisory — never blocks
   export.
 
-Model used: `gemini-2.5-flash` by default (override via the `GEMINI_MODEL`
-env var — `gemini-flash-lite-latest` is a good choice if you hit the free
-tier's rate limit often, since it has a higher free-tier cap). The
-function retries on `429`/`503` with exponential backoff (up to 4 retries)
-since the Gemini free tier caps around 15 requests/minute.
+Model used: `gemini-flash-latest` by default — a rolling alias to whatever
+Google's current GA flash model is, chosen specifically so this doesn't
+break every time Google deprecates a dated model (which has been
+happening every few months). Override via the `GEMINI_MODEL` env var if
+you want to pin a specific dated model, or try `gemini-flash-lite-latest`
+if you hit the free tier's rate limit often (it has a higher free-tier
+cap). The function retries on `429`/`503` with exponential backoff (up to
+4 retries) since the Gemini free tier caps around 15 requests/minute.
 
 ## Deploying to Vercel
 
@@ -100,13 +103,13 @@ since the Gemini free tier caps around 15 requests/minute.
    → **Settings** → **Environment Variables** → add a new variable:
    - Key: `GEMINI_API_KEY`
    - Value: your key from [Google AI Studio](https://aistudio.google.com/apikey)
-     (free tier is fine — `gemini-2.5-flash` / `gemini-flash-lite-latest`)
+     (free tier is fine)
    - Environment: check all three (Production, Preview, Development)
    - Save, then **redeploy** (env var changes don't apply to already-built
      deployments) — Deployments tab → "..." on the latest deployment →
      Redeploy.
    Optionally also add `GEMINI_MODEL` the same way if you want to pin a
-   specific model instead of the `gemini-2.5-flash` default.
+   specific dated model instead of the `gemini-flash-latest` default.
 3. That's it — no database, no other config. Share the resulting
    `*.vercel.app` URL (or a custom domain, if you attach one in Settings →
    Domains) with the team.
