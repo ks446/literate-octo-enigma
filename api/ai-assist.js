@@ -2,7 +2,10 @@
 // Calls the Gemini API server-side so GEMINI_API_KEY is never exposed to the browser.
 // POST /api/ai-assist  { mode: 'suggest-recommendations' | 'improve-summary' | 'whats-missing', payload: {...} }
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// 'gemini-flash-latest' is a rolling alias to the current GA flash model, so this
+// keeps working across Google's model deprecations without a code change. Pin to a
+// specific dated model via GEMINI_MODEL only if you need reproducible behavior.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 const MAX_RETRIES = 4;
 const BASE_DELAY_MS = 800;
 
