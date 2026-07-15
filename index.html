@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EditVideo.io — Channel Audit Report Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Playfair+Display:wght@700;800&family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    /* editor chrome */
+    --ink:#0F1115; --panel:#161A22; --panel-2:#1C212C; --border:#262C39;
+    --text:#E8EAF0; --muted:#8890A2; --accent:#35C7C0; --accent-dim: rgba(53,199,192,.14); --danger:#E35555;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ink);color:var(--text);font-family:'Inter',sans-serif;height:100%;}
+  ::selection{background:var(--accent-dim);}
+
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;}
+  .topbar .brand{display:flex;align-items:center;gap:10px;}
+  .topbar .brand .mark{width:28px;height:28px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:700;font-size:13px;font-family:'Poppins',sans-serif;}
+  .topbar .brand h1{font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;margin:0;letter-spacing:.2px;}
+  .topbar .brand span{color:var(--muted);font-size:12px;}
+  #exportBtn{background:var(--accent);color:#08211F;border:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:13.5px;cursor:pointer;font-family:'Inter',sans-serif;}
+  #exportBtn:hover{filter:brightness(1.05);}
+
+  .workspace{flex:1;display:flex;min-height:0;}
+  .tabs{width:172px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:14px 10px;gap:2px;overflow-y:auto;}
+  .tabs button{all:unset;cursor:pointer;padding:10px 12px;border-radius:8px;font-size:12.5px;color:var(--muted);font-weight:500;display:flex;align-items:center;gap:9px;}
+  .tabs button .dot{width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0;}
+  .tabs button:hover{background:var(--panel-2);color:var(--text);}
+  .tabs button.active{background:var(--accent-dim);color:var(--accent);}
+  .tabs button.active .dot{background:var(--accent);}
+
+  .editor{width:420px;flex-shrink:0;overflow-y:auto;padding:22px 24px 70px;border-right:1px solid var(--border);background:var(--ink);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .panel h2{font-family:'Poppins',sans-serif;font-size:15px;margin:0 0 4px;}
+  .panel .sub{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.5;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;}
+  .field input[type=text],.field input[type=number],.field textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 11px;font-size:13.5px;font-family:'Inter',sans-serif;}
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--accent);}
+  .field textarea{resize:vertical;min-height:76px;line-height:1.5;}
+  .field .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  .file-drop{border:1.5px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;color:var(--muted);font-size:12px;margin-bottom:12px;}
+  .file-drop:hover{border-color:var(--accent);color:var(--accent);}
+  .file-drop input{display:none;}
+
+  .color-row{display:flex;align-items:center;gap:10px;}
+  .color-row input[type=color]{width:40px;height:36px;border:none;background:none;padding:0;cursor:pointer;border-radius:6px;overflow:hidden;}
+  .color-row span{font-size:12px;color:var(--muted);font-family:monospace;}
+
+  .btn-ghost{all:unset;cursor:pointer;font-size:12px;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:7px 11px;display:inline-block;}
+  .btn-ghost.danger{color:var(--danger);border-color:var(--danger);}
+  .add-btn{all:unset;cursor:pointer;color:var(--accent);font-size:12.5px;font-weight:600;padding:6px 0;display:inline-block;}
+
+  /* video table editor */
+  .vid-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--panel);margin-bottom:10px;position:relative;}
+  .vid-card .rm{position:absolute;top:8px;right:10px;all:unset;cursor:pointer;color:var(--danger);font-size:13px;}
+  .vid-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+  .vid-grid input{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 9px;font-size:12px;}
+  .vid-grid label{grid-column:1/-1;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:2px 0 -4px;}
+  .vid-notes{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 9px;font-size:12px;}
+
+  .csv-table-wrap{max-height:180px;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-top:10px;}
+  table.csvprev{border-collapse:collapse;width:100%;font-size:11px;}
+  table.csvprev th,table.csvprev td{padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;}
+  table.csvprev th{color:var(--muted);position:sticky;top:0;background:var(--panel);}
+
+  /* analysis section cards */
+  .an-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--panel);margin-bottom:16px;position:relative;}
+  .an-card .rm-section{position:absolute;top:12px;right:12px;all:unset;cursor:pointer;color:var(--danger);font-size:11px;border:1px solid var(--danger);border-radius:6px;padding:4px 8px;}
+  .an-head-row{display:grid;grid-template-columns:56px 1fr;gap:8px;margin-bottom:12px;}
+  .an-head-row input{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 9px;font-size:13px;}
+  .an-shot-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .an-shot{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;flex-shrink:0;}
+  .an-shot img{width:100%;height:100%;object-fit:cover;}
+  .an-shot .rm-shot{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;cursor:pointer;}
+  .an-shot-cap{width:100%;font-size:10px;margin-top:3px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 5px;}
+
+  .preview{flex:1;overflow:auto;background:#05060a;padding:36px;display:flex;flex-direction:column;align-items:center;gap:28px;}
+  .report{width:800px;flex-shrink:0;}
+  .report-page{background:var(--r-bg);color:var(--r-text);width:800px;min-height:1060px;box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;font-family:'Poppins',sans-serif;}
+  .report-page + .report-page{margin-top:28px;}
+  .rp-pad{padding:64px 64px;height:100%;}
+
+  /* Cover */
+  .cover .rp-pad{padding:0;height:1060px;display:flex;flex-direction:column;}
+  .cover-top{padding:40px 52px 0;display:flex;justify-content:space-between;align-items:center;}
+  .cover-top .agency{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13px;letter-spacing:.06em;}
+  .cover-top .agency img{height:26px;max-width:140px;object-fit:contain;}
+  .cover-top .yr{font-weight:700;font-size:13px;letter-spacing:.06em;}
+  .cover-spacer1{flex:1.1;}
+  .cover-title-wrap{padding:0 60px;text-align:center;}
+  .cover-title{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:46px;line-height:1.05;margin:0;}
+  .cover-spacer2{flex:.5;}
+  .cover-client{font-family:'Playfair Display',serif;font-weight:800;font-size:26px;text-transform:uppercase;letter-spacing:.05em;text-align:center;}
+  .cover-spacer3{flex:1.6;}
+
+  .sec-title-centered{font-family:'Poppins',sans-serif;font-size:22px;font-weight:600;text-align:center;margin:0 0 30px;}
+  .sec-title-left{font-family:'Poppins',sans-serif;font-size:20px;font-weight:600;text-align:left;margin:0 0 22px;}
+  .narrative-centered{font-size:14.5px;line-height:1.85;text-align:center;max-width:640px;margin:0 auto;white-space:pre-wrap;}
+  .narrative-left{font-size:14px;line-height:1.8;text-align:left;white-space:pre-wrap;}
+
+  .empty-note{opacity:.65;font-style:italic;font-size:13px;}
+
+  /* video table */
+  .vtable-wrap{background:var(--r-table-bg);border-radius:12px;padding:20px 18px;overflow-x:auto;}
+  table.perf{width:100%;border-collapse:collapse;font-size:11.5px;color:#fff;}
+  table.perf th{text-align:left;font-weight:600;font-size:10.5px;color:rgba(255,255,255,.55);padding:0 10px 10px;text-transform:uppercase;letter-spacing:.03em;}
+  table.perf td{padding:10px 10px;border-top:1px solid rgba(255,255,255,.08);font-variant-numeric:tabular-nums;vertical-align:top;}
+  table.perf td:first-child{color:rgba(255,255,255,.5);}
+
+  .bullets{list-style:disc;padding-left:20px;margin:0;}
+  .bullets li{margin-bottom:10px;font-size:14px;line-height:1.6;}
+  .bullets.centered{text-align:left;max-width:640px;margin:0 auto;}
+
+  .rec-list{list-style:none;padding:0;margin:0 0 22px;}
+  .rec-list li{display:flex;gap:14px;padding:10px 0;font-size:14px;line-height:1.6;}
+  .rec-list li .num{font-weight:700;flex-shrink:0;opacity:.6;}
+
+  .an-eyebrow{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.7;margin-bottom:10px;}
+  .an-title-row{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;margin-bottom:18px;}
+  .an-shots-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px;}
+  .an-shots-grid.n1{grid-template-columns:1fr;}
+  .an-shots-grid.n2{grid-template-columns:1fr 1fr;}
+  .an-shot-fig{border-radius:8px;overflow:hidden;background:rgba(0,0,0,.15);}
+  .an-shot-fig img{width:100%;display:block;max-height:160px;object-fit:cover;}
+  .an-shot-fig figcaption{padding:8px 10px;font-size:11px;opacity:.75;}
+
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  @media (max-width: 980px){ .editor{width:320px;} .report,.report-page{width:640px;} }
+
+  @media print{
+    body{background:#fff;}
+    .topbar,.tabs,.editor{display:none !important;}
+    .workspace{display:block;}
+    .preview{background:#fff;padding:0;display:block;}
+    .report{width:auto;}
+    .report-page{box-shadow:none;width:auto;min-height:0;page-break-after:always;}
+    .report-page:last-child{page-break-after:auto;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark">▶</div>
+      <h1>Channel Audit — Report Builder</h1>
+      <span>— EditVideo.io</span>
+    </div>
+    <button id="exportBtn">Export report ↗</button>
+  </div>
+
+  <div class="workspace">
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="cover"><span class="dot"></span>Cover & client</button>
+      <button class="tab-btn" data-tab="summary"><span class="dot"></span>Exec summary</button>
+      <button class="tab-btn" data-tab="videos"><span class="dot"></span>Top videos</button>
+      <button class="tab-btn" data-tab="notables"><span class="dot"></span>Notables & recs</button>
+      <button class="tab-btn" data-tab="analysis"><span class="dot"></span>Deep-dive analysis</button>
+      <button class="tab-btn" data-tab="branding"><span class="dot"></span>Branding</button>
+      <button class="tab-btn" data-tab="save"><span class="dot"></span>Save & team access</button>
+    </nav>
+
+    <div class="editor">
+
+      <!-- COVER -->
+      <div class="panel active" data-panel="cover">
+        <h2>Cover & client</h2>
+        <p class="sub">The basics that anchor the cover page.</p>
+        <div class="field"><label>Client / channel name</label><input type="text" id="cv-client" placeholder="e.g. HeySherri"></div>
+        <div class="field"><label>Report title</label><input type="text" id="cv-title"></div>
+        <div class="field"><label>Year / period label</label><input type="text" id="cv-period" placeholder="e.g. 2026 or Q2 2026"></div>
+      </div>
+
+      <!-- SUMMARY -->
+      <div class="panel" data-panel="summary">
+        <h2>Executive summary</h2>
+        <p class="sub">The top-line narrative — what happened this period, in plain language.</p>
+        <div class="field"><textarea id="sm-text" placeholder="Over this 28-day period, the channel delivered strong results: 6,086 views..." style="min-height:220px;"></textarea></div>
+      </div>
+
+      <!-- VIDEOS -->
+      <div class="panel" data-panel="videos">
+        <h2>Top videos</h2>
+        <p class="sub">Import the YouTube Analytics CSV, or add rows manually. Ranked by views automatically.</p>
+        <label class="file-drop" for="csvFile">Click to upload .csv, or paste below<input type="file" id="csvFile" accept=".csv"></label>
+        <div class="field"><label>Or paste CSV text</label><textarea id="csvPaste" placeholder="Video title,Views,Watch time (hours),..." style="min-height:60px;"></textarea></div>
+        <button class="btn-ghost" id="parseCsvBtn">Parse CSV</button>
+        <div id="csvPreviewWrap"></div>
+        <div class="field" style="margin-top:16px;"><label>Show top N in report</label><input type="number" id="vid-topn" value="5" min="1" max="20"></div>
+        <div id="vidList" style="margin-top:10px;"></div>
+        <button class="add-btn" id="addVidBtn">+ Add video row</button>
+      </div>
+
+      <!-- NOTABLES -->
+      <div class="panel" data-panel="notables">
+        <h2>Notables & recommendations</h2>
+        <p class="sub">One line per bullet. Use "Label: detail" and the label bolds automatically.</p>
+        <div class="field"><label>Other notables</label><textarea id="nt-notables" placeholder="Watch Out for the Crocodile (164 views, 7.51% CTR): shortest video, highest efficiency." style="min-height:110px;"></textarea></div>
+        <div class="field"><label>Recommendations heading</label><input type="text" id="nt-recs-heading" value="Recommendations for Growth"></div>
+        <div class="field"><label>Recommendations (one per line)</label><textarea id="nt-recs" placeholder="Prioritize formats: more movement-song singles + quick compilations." style="min-height:110px;"></textarea></div>
+        <div class="field"><label>Closing takeaway</label><textarea id="nt-closing" placeholder="This data confirms the channel is on an upward trajectory..." style="min-height:70px;"></textarea></div>
+      </div>
+
+      <!-- ANALYSIS -->
+      <div class="panel" data-panel="analysis">
+        <h2>Deep-dive analysis</h2>
+        <p class="sub">Repeatable audit sections (thumbnails, SEO, content strategy, etc.). Each becomes its own set of report pages.</p>
+        <div id="analysisList"></div>
+        <button class="add-btn" id="addAnalysisBtn">+ Add analysis section</button>
+      </div>
+
+      <!-- BRANDING -->
+      <div class="panel" data-panel="branding">
+        <h2>Agency branding</h2>
+        <p class="sub">Applied to every report this builder generates.</p>
+        <div class="field"><label>Agency name</label><input type="text" id="bd-name" value="EDITVIDEO.IO"></div>
+        <label class="file-drop" for="logoFile">Click to upload logo (optional — shows a text wordmark otherwise)<input type="file" id="logoFile" accept="image/*"></label>
+        <div class="field"><label>Background color</label><div class="color-row"><input type="color" id="bd-bg" value="#8C1C1C"><span id="bd-bg-hex">#8C1C1C</span></div></div>
+        <div class="field"><label>Text color</label><div class="color-row"><input type="color" id="bd-text" value="#F5EEDF"><span id="bd-text-hex">#F5EEDF</span></div></div>
+        <div class="field"><label>Data table background</label><div class="color-row"><input type="color" id="bd-table" value="#141414"><span id="bd-table-hex">#141414</span></div></div>
+      </div>
+
+      <!-- SAVE -->
+      <div class="panel" data-panel="save">
+        <h2>Save & team access</h2>
+        <p class="sub">Works once this app is <strong>published</strong> (top-right of the artifact panel). Saved reports use shared storage — anyone on your team who opens the published link can load them too.</p>
+        <div class="field"><label>Client key</label><input type="text" id="sv-key" placeholder="heysherri"></div>
+        <button class="btn-ghost" id="saveBtn">Save this report</button>
+        <button class="btn-ghost" id="refreshListBtn" style="margin-left:8px;">Refresh list</button>
+        <div id="savedList" style="margin-top:16px;"></div>
+        <p class="field hint" id="saveStatus"></p>
+      </div>
+
+    </div>
+
+    <div class="preview">
+      <div class="report" id="reportRoot"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------- State ----------------
+let uidCounter = 1;
+function uid(){ return 'id'+(uidCounter++); }
+
+const state = {
+  cover: { client:'', title:'YouTube Channel Audit & Strategy Report', period: String(new Date().getFullYear()) },
+  summary:'',
+  videos:[],
+  showTopN:5,
+  notables:'',
+  recsHeading:'Recommendations for Growth',
+  recs:'',
+  notablesClosing:'',
+  analysis:[
+    {id:uid(), emoji:'🎨', title:'Thumbnail & Visual Branding Audit', intro:'', images:[], working:'', improve:'', nextSteps:'', closing:''},
+    {id:uid(), emoji:'🔍', title:'SEO & Metadata Audit', intro:'', images:[], working:'', improve:'', nextSteps:'', closing:''}
+  ],
+  branding:{ agencyName:'EDITVIDEO.IO', logo:'', bg:'#8C1C1C', text:'#F5EEDF', tableBg:'#141414' }
+};
+
+// ---------------- Tabs ----------------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.panel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+// ---------------- Helpers ----------------
+function esc(str){ return (str||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(n){ n = Number(n)||0; return n.toLocaleString('en-US'); }
+function slugify(s){ return (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'client'; }
+function linesOf(str){ return (str||'').split('\n').map(s=>s.trim()).filter(Boolean); }
+function bulletHtml(line){
+  const idx = line.indexOf(':');
+  if(idx > 0 && idx < 60){
+    return `<li><strong>${esc(line.slice(0,idx+1))}</strong>${esc(line.slice(idx+1))}</li>`;
+  }
+  return `<li>${esc(line)}</li>`;
+}
+function resizeImageFile(file, maxWidth){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const scale = Math.min(1, maxWidth/img.width);
+        const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
+        const canvas = document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',0.82));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------------- Simple field bindings ----------------
+document.getElementById('cv-client').addEventListener('input', e=>{state.cover.client=e.target.value; render();});
+document.getElementById('cv-title').addEventListener('input', e=>{state.cover.title=e.target.value; render();});
+document.getElementById('cv-period').addEventListener('input', e=>{state.cover.period=e.target.value; render();});
+document.getElementById('cv-title').value = state.cover.title;
+document.getElementById('cv-period').value = state.cover.period;
+
+document.getElementById('sm-text').addEventListener('input', e=>{state.summary=e.target.value; render();});
+
+document.getElementById('nt-notables').addEventListener('input', e=>{state.notables=e.target.value; render();});
+document.getElementById('nt-recs-heading').addEventListener('input', e=>{state.recsHeading=e.target.value; render();});
+document.getElementById('nt-recs').addEventListener('input', e=>{state.recs=e.target.value; render();});
+document.getElementById('nt-closing').addEventListener('input', e=>{state.notablesClosing=e.target.value; render();});
+
+document.getElementById('bd-name').addEventListener('input', e=>{state.branding.agencyName=e.target.value; render();});
+document.getElementById('bd-bg').addEventListener('input', e=>{state.branding.bg=e.target.value; document.getElementById('bd-bg-hex').textContent=e.target.value; render();});
+document.getElementById('bd-text').addEventListener('input', e=>{state.branding.text=e.target.value; document.getElementById('bd-text-hex').textContent=e.target.value; render();});
+document.getElementById('bd-table').addEventListener('input', e=>{state.branding.tableBg=e.target.value; document.getElementById('bd-table-hex').textContent=e.target.value; render();});
+document.getElementById('logoFile').addEventListener('change', async e=>{
+  const file = e.target.files[0]; if(!file) return;
+  state.branding.logo = await resizeImageFile(file, 300);
+  render();
+});
+
+document.getElementById('vid-topn').addEventListener('input', e=>{state.showTopN = Number(e.target.value)||5; render();});
+
+// ---------------- Video rows ----------------
+const VID_FIELDS = ['title','date','duration','views','watch','subs','impressions','ctr','notes'];
+function newVideo(){ return {id:uid(), title:'', date:'', duration:'', views:0, watch:0, subs:0, impressions:0, ctr:0, notes:''}; }
+
+function renderVideoTable(){
+  const wrap = document.getElementById('vidList');
+  wrap.innerHTML = state.videos.map((v,i)=>`
+    <div class="vid-card" data-idx="${i}">
+      <button class="rm" data-act="rm-vid" data-idx="${i}">✕</button>
+      <div class="vid-grid">
+        <label>Title</label>
+        <input type="text" style="grid-column:1/-1" data-field="title" data-idx="${i}" value="${esc(v.title)}" placeholder="Video title">
+        <input type="text" data-field="date" data-idx="${i}" value="${esc(v.date)}" placeholder="Publish date">
+        <input type="text" data-field="duration" data-idx="${i}" value="${esc(v.duration)}" placeholder="Duration (sec)">
+        <input type="number" data-field="views" data-idx="${i}" value="${v.views}" placeholder="Views">
+        <input type="number" data-field="watch" data-idx="${i}" value="${v.watch}" placeholder="Watch hours">
+        <input type="number" data-field="subs" data-idx="${i}" value="${v.subs}" placeholder="Subs gained">
+        <input type="number" data-field="impressions" data-idx="${i}" value="${v.impressions}" placeholder="Impressions">
+        <input type="number" step="0.01" data-field="ctr" data-idx="${i}" value="${v.ctr}" placeholder="CTR %">
+      </div>
+      <textarea class="vid-notes" data-field="notes" data-idx="${i}" placeholder="Note — why this video mattered">${esc(v.notes)}</textarea>
+    </div>`).join('') || '<p class="sub" style="margin:0;">No videos yet — parse a CSV or add a row.</p>';
+}
+document.getElementById('vidList').addEventListener('input', e=>{
+  const t = e.target; if(!t.dataset.field) return;
+  const i = Number(t.dataset.idx), f = t.dataset.field;
+  const v = state.videos[i]; if(!v) return;
+  v[f] = ['views','watch','subs','impressions','ctr'].includes(f) ? (Number(t.value)||0) : t.value;
+  render();
+});
+document.getElementById('vidList').addEventListener('click', e=>{
+  if(e.target.dataset.act==='rm-vid'){ state.videos.splice(Number(e.target.dataset.idx),1); renderVideoTable(); render(); }
+});
+document.getElementById('addVidBtn').addEventListener('click', ()=>{ state.videos.push(newVideo()); renderVideoTable(); render(); });
+
+// ---------------- CSV ----------------
+function findCol(headers, pattern){ return headers.find(h=>pattern.test(h)); }
+function parseCsv(text){
+  const result = Papa.parse(text.trim(), {header:true, skipEmptyLines:true, dynamicTyping:true});
+  const headers = result.meta.fields || [];
+  const titleCol = findCol(headers,/video title|^title$/i);
+  const dateCol = findCol(headers,/publish date|^date$/i);
+  const durCol = findCol(headers,/duration/i);
+  const viewsCol = findCol(headers,/views/i);
+  const watchCol = findCol(headers,/watch time|watch hours/i);
+  const subsCol = findCol(headers,/subscribers gained|subs gained|subscribers/i);
+  const imprCol = findCol(headers,/impressions/i);
+  const ctrCol = findCol(headers,/ctr|click-through/i);
+  (result.data||[]).forEach(r=>{
+    state.videos.push({
+      id:uid(),
+      title: titleCol? String(r[titleCol]??''):'',
+      date: dateCol? String(r[dateCol]??''):'',
+      duration: durCol? String(r[durCol]??''):'',
+      views: viewsCol? Number(r[viewsCol])||0:0,
+      watch: watchCol? Number(r[watchCol])||0:0,
+      subs: subsCol? Number(r[subsCol])||0:0,
+      impressions: imprCol? Number(r[imprCol])||0:0,
+      ctr: ctrCol? Number(r[ctrCol])||0:0,
+      notes:''
+    });
+  });
+  renderVideoTable(); render();
+}
+document.getElementById('parseCsvBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('csvPaste').value;
+  if(text.trim()) parseCsv(text);
+});
+document.getElementById('csvFile').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ document.getElementById('csvPaste').value = reader.result; parseCsv(reader.result); };
+  reader.readAsText(file);
+});
+
+// ---------------- Analysis sections ----------------
+function newAnalysis(){ return {id:uid(), emoji:'🔎', title:'New analysis section', intro:'', images:[], working:'', improve:'', nextSteps:'', closing:''}; }
+
+function renderAnalysisPanel(){
+  const wrap = document.getElementById('analysisList');
+  wrap.innerHTML = state.analysis.map((a,i)=>`
+    <div class="an-card" data-idx="${i}">
+      <button class="rm-section" data-act="rm-section" data-idx="${i}">Remove section</button>
+      <div class="an-head-row">
+        <input type="text" data-field="emoji" data-idx="${i}" value="${esc(a.emoji)}" maxlength="4">
+        <input type="text" data-field="title" data-idx="${i}" value="${esc(a.title)}" placeholder="Section title">
+      </div>
+      <div class="field"><label>Intro / context</label><textarea data-field="intro" data-idx="${i}" placeholder="What this section covers and why it matters.">${esc(a.intro)}</textarea></div>
+      <label class="file-drop" data-act="shot-label" data-idx="${i}">Click to add reference image(s) — e.g. thumbnails<input type="file" accept="image/*" multiple data-act="shot-input" data-idx="${i}"></label>
+      <div class="an-shot-row" data-role="shots" data-idx="${i}">
+        ${a.images.map((im,j)=>`
+          <div>
+            <div class="an-shot"><img src="${im.data}"><button class="rm-shot" data-act="rm-shot" data-idx="${i}" data-jdx="${j}">×</button></div>
+            <input type="text" class="an-shot-cap" data-act="shot-cap" data-idx="${i}" data-jdx="${j}" value="${esc(im.caption)}" placeholder="Caption">
+          </div>`).join('')}
+      </div>
+      <div class="field"><label>What's working (one per line)</label><textarea data-field="working" data-idx="${i}" placeholder="Label: detail...">${esc(a.working)}</textarea></div>
+      <div class="field"><label>What needs improvement (one per line)</label><textarea data-field="improve" data-idx="${i}" placeholder="Label: detail...">${esc(a.improve)}</textarea></div>
+      <div class="field"><label>Actionable next steps (one per line)</label><textarea data-field="nextSteps" data-idx="${i}" placeholder="Label: detail...">${esc(a.nextSteps)}</textarea></div>
+      <div class="field"><label>Closing note</label><textarea data-field="closing" data-idx="${i}" placeholder="Wrap-up line for this section.">${esc(a.closing)}</textarea></div>
+    </div>`).join('');
+}
+document.getElementById('analysisList').addEventListener('input', e=>{
+  const t = e.target; if(!t.dataset.field || t.dataset.act==='shot-cap') return;
+  const i = Number(t.dataset.idx); const a = state.analysis[i]; if(!a) return;
+  a[t.dataset.field] = t.value; render();
+});
+document.getElementById('analysisList').addEventListener('input', e=>{
+  if(e.target.dataset.act==='shot-cap'){
+    const i = Number(e.target.dataset.idx), j = Number(e.target.dataset.jdx);
+    state.analysis[i].images[j].caption = e.target.value; render();
+  }
+});
+document.getElementById('analysisList').addEventListener('change', async e=>{
+  if(e.target.dataset.act==='shot-input'){
+    const i = Number(e.target.dataset.idx);
+    const files = Array.from(e.target.files).slice(0, 3-state.analysis[i].images.length);
+    for(const file of files){
+      const data = await resizeImageFile(file, 700);
+      state.analysis[i].images.push({data, caption:''});
+    }
+    e.target.value='';
+    renderAnalysisPanel(); render();
+  }
+});
+document.getElementById('analysisList').addEventListener('click', e=>{
+  const act = e.target.dataset.act;
+  if(act==='rm-section'){ state.analysis.splice(Number(e.target.dataset.idx),1); renderAnalysisPanel(); render(); }
+  if(act==='rm-shot'){
+    const i = Number(e.target.dataset.idx), j = Number(e.target.dataset.jdx);
+    state.analysis[i].images.splice(j,1); renderAnalysisPanel(); render();
+  }
+});
+document.getElementById('addAnalysisBtn').addEventListener('click', ()=>{
+  state.analysis.push(newAnalysis()); renderAnalysisPanel(); render();
+});
+
+// ---------------- Report render ----------------
+function reportPage(innerHtml, extraClass=''){
+  return `<div class="report-page ${extraClass}"><div class="rp-pad">${innerHtml}</div></div>`;
+}
+
+function render(){
+  const root = document.getElementById('reportRoot');
+  const b = state.branding;
+  root.style.setProperty('--r-bg', b.bg);
+  root.style.setProperty('--r-text', b.text);
+  root.style.setProperty('--r-table-bg', b.tableBg);
+
+  const agencyLogo = b.logo ? `<img src="${b.logo}">` : `<span>${esc(b.agencyName||'YOUR AGENCY')}</span>`;
+
+  // Cover
+  const cover = reportPage(`
+    <div class="cover-top">
+      <div class="agency">${agencyLogo}</div>
+      <div class="yr">${esc(state.cover.period)}</div>
+    </div>
+    <div class="cover-spacer1"></div>
+    <div class="cover-title-wrap"><h1 class="cover-title">${esc(state.cover.title)}</h1></div>
+    <div class="cover-spacer2"></div>
+    <div class="cover-client">${esc(state.cover.client || 'Client Channel Name')}</div>
+    <div class="cover-spacer3"></div>
+  `, 'cover');
+
+  // Executive summary
+  const summaryHtml = state.summary
+    ? esc(state.summary)
+    : '<span class="empty-note">Add the executive summary in the "Exec summary" tab.</span>';
+  const summaryPage = reportPage(`
+    <h2 class="sec-title-centered">Executive Summary</h2>
+    <div class="narrative-centered">${summaryHtml}</div>
+  `);
+
+  // Top videos
+  let videosPage = '';
+  if(state.videos.length){
+    const sorted = [...state.videos].sort((x,y)=>(y.views||0)-(x.views||0)).slice(0, state.showTopN||5);
+    const rows = sorted.map((v,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${esc(v.title)||'—'}</td>
+        <td>${esc(v.date)||'—'}</td>
+        <td>${esc(v.duration)||'—'}</td>
+        <td>${fmt(v.views)}</td>
+        <td>${(Number(v.watch)||0).toFixed(2)}</td>
+        <td>${fmt(v.subs)}</td>
+        <td>${fmt(v.impressions)}</td>
+        <td>${(Number(v.ctr)||0).toFixed(2)}%</td>
+        <td>${esc(v.notes)||'—'}</td>
+      </tr>`).join('');
+    videosPage = reportPage(`
+      <h2 class="sec-title-centered">Top ${state.showTopN||5} Videos by Views</h2>
+      <div class="vtable-wrap">
+        <table class="perf">
+          <thead><tr><th>Rank</th><th>Video Title</th><th>Publish Date</th><th>Duration (sec)</th><th>Views</th><th>Watch Hours</th><th>Subs Gained</th><th>Impressions</th><th>CTR (%)</th><th>Notes</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `);
+  }
+
+  // Notables + recs
+  const notableLines = linesOf(state.notables);
+  const recLines = linesOf(state.recs);
+  const notablesHtml = notableLines.length
+    ? `<ul class="bullets">${notableLines.map(bulletHtml).join('')}</ul>`
+    : '<span class="empty-note">Add notable performers in the "Notables & recs" tab.</span>';
+  const recsHtml = recLines.length
+    ? `<ul class="rec-list">${recLines.map((r,i)=>`<li><span class="num">${(i+1).toString().padStart(2,'0')}</span><span>${esc(r)}</span></li>`).join('')}</ul>`
+    : '<span class="empty-note">Add recommendations in the "Notables & recs" tab.</span>';
+  const notablesPage = reportPage(`
+    <h2 class="sec-title-left">Other notables</h2>
+    ${notablesHtml}
+    <h2 class="sec-title-left" style="margin-top:32px;">${esc(state.recsHeading||'Recommendations')}</h2>
+    ${recsHtml}
+    ${state.notablesClosing ? `<div class="narrative-left">${esc(state.notablesClosing)}</div>` : ''}
+  `);
+
+  // Analysis sections
+  let analysisPages = '';
+  state.analysis.forEach((a, idx)=>{
+    const workingLines = linesOf(a.working);
+    const improveLines = linesOf(a.improve);
+    const nextLines = linesOf(a.nextSteps);
+    const hasIntroContent = a.intro || a.images.length || a.title;
+
+    if(hasIntroContent){
+      const shotsGridClass = a.images.length===1?'n1':(a.images.length===2?'n2':'');
+      analysisPages += reportPage(`
+        ${idx===0 ? '<div class="an-eyebrow">Deep-Dive Analysis</div>' : ''}
+        <div class="an-title-row"><span>${esc(a.emoji)}</span><span>${esc(a.title)}</span></div>
+        ${a.intro ? `<div class="narrative-left">${esc(a.intro)}</div>` : ''}
+        ${a.images.length ? `<div class="an-shots-grid ${shotsGridClass}">${a.images.map(im=>`<figure class="an-shot-fig"><img src="${im.data}"><figcaption>${esc(im.caption)||'—'}</figcaption></figure>`).join('')}</div>` : ''}
+      `);
+    }
+    if(workingLines.length){
+      analysisPages += reportPage(`
+        <h2 class="sec-title-left">What's Working</h2>
+        <ul class="bullets">${workingLines.map(bulletHtml).join('')}</ul>
+      `);
+    }
+    if(improveLines.length){
+      analysisPages += reportPage(`
+        <h2 class="sec-title-left">What Needs Improvement</h2>
+        <ul class="bullets">${improveLines.map(bulletHtml).join('')}</ul>
+      `);
+    }
+    if(nextLines.length || a.closing){
+      analysisPages += reportPage(`
+        <h2 class="sec-title-left">Actionable Next Steps (This Month)</h2>
+        ${nextLines.length ? `<ul class="bullets">${nextLines.map(bulletHtml).join('')}</ul>` : ''}
+        ${a.closing ? `<div class="narrative-left" style="margin-top:20px;">${esc(a.closing)}</div>` : ''}
+      `);
+    }
+  });
+
+  root.innerHTML = cover + summaryPage + videosPage + notablesPage + analysisPages;
+}
+
+document.getElementById('exportBtn').addEventListener('click', ()=>window.print());
+
+// ---------------- Save & team access ----------------
+// NOTE FOR DEPLOYMENT: window.storage below is a Claude-artifact-only API.
+// It does NOT exist in a normal browser / standalone deployment.
+// If deploying outside claude.ai (Vercel, Netlify, etc.), this whole block
+// needs to be replaced with a real persistence layer (see README.md).
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  const status = document.getElementById('saveStatus');
+  const key = slugify(document.getElementById('sv-key').value || state.cover.client);
+  try{
+    await window.storage.set('report:'+key, JSON.stringify(state), true);
+    status.textContent = `Saved as "${key}". Anyone with the published link can load it from this tab.`;
+    refreshSavedList();
+  }catch(err){
+    status.textContent = 'Could not save — publish this artifact first (top-right of the artifact panel), then try again.';
+  }
+});
+document.getElementById('refreshListBtn').addEventListener('click', refreshSavedList);
+
+async function refreshSavedList(){
+  const wrap = document.getElementById('savedList');
+  try{
+    const res = await window.storage.list('report:', true);
+    const keys = (res && res.keys) || [];
+    wrap.innerHTML = keys.length ? keys.map(k=>{
+      const label = k.replace(/^report:/,'');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:12.5px;">${esc(label)}</span>
+        <span><button class="btn-ghost" data-act="load" data-key="${esc(k)}">Load</button>
+        <button class="btn-ghost danger" data-act="del" data-key="${esc(k)}" style="margin-left:6px;">Delete</button></span>
+      </div>`;
+    }).join('') : '<p class="sub" style="margin:0;">No saved reports yet.</p>';
+  }catch(err){
+    wrap.innerHTML = '<p class="sub" style="margin:0;">Saved reports will appear here once this app is published.</p>';
+  }
+}
+document.getElementById('savedList').addEventListener('click', async e=>{
+  const act = e.target.dataset.act, key = e.target.dataset.key;
+  if(!act) return;
+  if(act==='del'){
+    try{ await window.storage.delete(key, true); refreshSavedList(); }catch(err){}
+  }
+  if(act==='load'){
+    try{
+      const res = await window.storage.get(key, true);
+      if(res && res.value){
+        const loaded = JSON.parse(res.value);
+        Object.assign(state, loaded);
+        hydrateForm();
+        document.getElementById('saveStatus').textContent = `Loaded "${key.replace(/^report:/,'')}".`;
+      }
+    }catch(err){
+      document.getElementById('saveStatus').textContent = 'Could not load that report.';
+    }
+  }
+});
+
+function hydrateForm(){
+  document.getElementById('cv-client').value = state.cover.client||'';
+  document.getElementById('cv-title').value = state.cover.title||'';
+  document.getElementById('cv-period').value = state.cover.period||'';
+  document.getElementById('sm-text').value = state.summary||'';
+  document.getElementById('vid-topn').value = state.showTopN||5;
+  document.getElementById('nt-notables').value = state.notables||'';
+  document.getElementById('nt-recs-heading').value = state.recsHeading||'';
+  document.getElementById('nt-recs').value = state.recs||'';
+  document.getElementById('nt-closing').value = state.notablesClosing||'';
+  document.getElementById('bd-name').value = state.branding.agencyName||'';
+  document.getElementById('bd-bg').value = state.branding.bg||'#8C1C1C';
+  document.getElementById('bd-bg-hex').textContent = state.branding.bg||'#8C1C1C';
+  document.getElementById('bd-text').value = state.branding.text||'#F5EEDF';
+  document.getElementById('bd-text-hex').textContent = state.branding.text||'#F5EEDF';
+  document.getElementById('bd-table').value = state.branding.tableBg||'#141414';
+  document.getElementById('bd-table-hex').textContent = state.branding.tableBg||'#141414';
+  renderVideoTable();
+  renderAnalysisPanel();
+  render();
+}
+
+// ---------------- init ----------------
+renderVideoTable();
+renderAnalysisPanel();
+refreshSavedList();
+render();
+</script>
+</body>
+</html>
