@@ -134,6 +134,29 @@
   .an-shot-fig img{width:100%;display:block;max-height:160px;object-fit:cover;}
   .an-shot-fig figcaption{padding:8px 10px;font-size:11px;opacity:.75;}
 
+  /* AI assist */
+  .ai-btn{all:unset;cursor:pointer;font-size:12px;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:7px 11px;display:inline-flex;align-items:center;gap:7px;margin-top:10px;}
+  .ai-btn:hover{background:var(--accent-dim);}
+  .ai-btn[disabled]{opacity:.55;cursor:default;}
+  .ai-btn .spin{width:10px;height:10px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:none;flex-shrink:0;}
+  .ai-btn.loading .spin{display:inline-block;animation:ai-spin .7s linear infinite;}
+  @keyframes ai-spin{to{transform:rotate(360deg);}}
+  .ai-result{margin-top:10px;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--panel);font-size:12.5px;}
+  .ai-result.ai-err{color:var(--danger);}
+  .ai-rec-item{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;}
+  .ai-rec-item input[type=checkbox]{margin-top:6px;flex-shrink:0;}
+  .ai-rec-item textarea{flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 9px;font-size:12px;font-family:'Inter',sans-serif;min-height:44px;resize:vertical;}
+  .ai-draft{width:100%;min-height:140px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 9px;font-size:12.5px;font-family:'Inter',sans-serif;resize:vertical;}
+  .ai-flags{list-style:disc;padding-left:18px;margin:0;}
+  .ai-flags li{margin-bottom:7px;line-height:1.5;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(5,6,10,.65);display:none;align-items:center;justify-content:center;z-index:50;}
+  .modal-overlay.active{display:flex;}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;width:460px;max-width:calc(100vw - 40px);max-height:70vh;overflow-y:auto;position:relative;}
+  .modal-box h3{margin:0 0 14px;font-family:'Poppins',sans-serif;font-size:15px;padding-right:20px;}
+  .modal-close{all:unset;cursor:pointer;position:absolute;top:18px;right:20px;color:var(--muted);font-size:15px;}
+  .modal-close:hover{color:var(--text);}
+
   ::-webkit-scrollbar{width:9px;height:9px;}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;}
   ::-webkit-scrollbar-track{background:transparent;}
@@ -160,7 +183,18 @@
       <h1>Channel Audit — Report Builder</h1>
       <span>— EditVideo.io</span>
     </div>
-    <button id="exportBtn">Export report ↗</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="missingBtn" class="ai-btn" style="margin-top:0;"><span class="spin"></span><span class="label">🔎 What am I missing?</span></button>
+      <button id="exportBtn">Export report ↗</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="missingModal">
+    <div class="modal-box">
+      <button class="modal-close" id="missingModalClose">✕</button>
+      <h3>What am I missing?</h3>
+      <div id="missingModalBody"><p class="sub" style="margin:0;">Checking…</p></div>
+    </div>
   </div>
 
   <div class="workspace">
@@ -190,6 +224,8 @@
         <h2>Executive summary</h2>
         <p class="sub">The top-line narrative — what happened this period, in plain language.</p>
         <div class="field"><textarea id="sm-text" placeholder="Over this 28-day period, the channel delivered strong results: 6,086 views..." style="min-height:220px;"></textarea></div>
+        <button class="ai-btn" id="improveSummaryBtn"><span class="spin"></span><span class="label">✨ Improve this summary</span></button>
+        <div id="summaryAiResult"></div>
       </div>
 
       <!-- VIDEOS -->
@@ -212,7 +248,9 @@
         <div class="field"><label>Other notables</label><textarea id="nt-notables" placeholder="Watch Out for the Crocodile (164 views, 7.51% CTR): shortest video, highest efficiency." style="min-height:110px;"></textarea></div>
         <div class="field"><label>Recommendations heading</label><input type="text" id="nt-recs-heading" value="Recommendations for Growth"></div>
         <div class="field"><label>Recommendations (one per line)</label><textarea id="nt-recs" placeholder="Prioritize formats: more movement-song singles + quick compilations." style="min-height:110px;"></textarea></div>
-        <div class="field"><label>Closing takeaway</label><textarea id="nt-closing" placeholder="This data confirms the channel is on an upward trajectory..." style="min-height:70px;"></textarea></div>
+        <button class="ai-btn" id="suggestRecsBtn"><span class="spin"></span><span class="label">✨ Suggest recommendations</span></button>
+        <div id="recsAiResult"></div>
+        <div class="field" style="margin-top:14px;"><label>Closing takeaway</label><textarea id="nt-closing" placeholder="This data confirms the channel is on an upward trajectory..." style="min-height:70px;"></textarea></div>
       </div>
 
       <!-- ANALYSIS -->
@@ -229,19 +267,19 @@
         <p class="sub">Applied to every report this builder generates.</p>
         <div class="field"><label>Agency name</label><input type="text" id="bd-name" value="EDITVIDEO.IO"></div>
         <label class="file-drop" for="logoFile">Click to upload logo (optional — shows a text wordmark otherwise)<input type="file" id="logoFile" accept="image/*"></label>
-        <div class="field"><label>Background color</label><div class="color-row"><input type="color" id="bd-bg" value="#8C1C1C"><span id="bd-bg-hex">#8C1C1C</span></div></div>
-        <div class="field"><label>Text color</label><div class="color-row"><input type="color" id="bd-text" value="#F5EEDF"><span id="bd-text-hex">#F5EEDF</span></div></div>
-        <div class="field"><label>Data table background</label><div class="color-row"><input type="color" id="bd-table" value="#141414"><span id="bd-table-hex">#141414</span></div></div>
+        <div class="field"><label>Background color</label><div class="color-row"><input type="color" id="bd-bg" value="#1B0E3D"><span id="bd-bg-hex">#1B0E3D</span></div></div>
+        <div class="field"><label>Text color</label><div class="color-row"><input type="color" id="bd-text" value="#F4F1FA"><span id="bd-text-hex">#F4F1FA</span></div></div>
+        <div class="field"><label>Data table background</label><div class="color-row"><input type="color" id="bd-table" value="#120A28"><span id="bd-table-hex">#120A28</span></div></div>
+        <p class="field hint">Defaults sampled from editvideo.io's brand palette (deep indigo + off-white). Fully overridable here per-report.</p>
       </div>
 
       <!-- SAVE -->
       <div class="panel" data-panel="save">
         <h2>Save & team access</h2>
-        <p class="sub">Works once this app is <strong>published</strong> (top-right of the artifact panel). Saved reports use shared storage — anyone on your team who opens the published link can load them too.</p>
-        <div class="field"><label>Client key</label><input type="text" id="sv-key" placeholder="heysherri"></div>
-        <button class="btn-ghost" id="saveBtn">Save this report</button>
-        <button class="btn-ghost" id="refreshListBtn" style="margin-left:8px;">Refresh list</button>
-        <div id="savedList" style="margin-top:16px;"></div>
+        <p class="sub">No login, no server-side storage — reports are saved as a plain <code>.json</code> file. Export it to a shared Drive/Dropbox folder for your team, and re-import it later (here or on any teammate's machine) to keep editing.</p>
+        <div class="field"><label>File name</label><input type="text" id="sv-key" placeholder="heysherri"></div>
+        <button class="btn-ghost" id="exportJsonBtn">Export report as .json ↓</button>
+        <label class="btn-ghost" for="importJsonFile" style="margin-left:8px;">Import .json ↑<input type="file" id="importJsonFile" accept="application/json,.json" style="display:none;"></label>
         <p class="field hint" id="saveStatus"></p>
       </div>
 
@@ -271,7 +309,7 @@ const state = {
     {id:uid(), emoji:'🎨', title:'Thumbnail & Visual Branding Audit', intro:'', images:[], working:'', improve:'', nextSteps:'', closing:''},
     {id:uid(), emoji:'🔍', title:'SEO & Metadata Audit', intro:'', images:[], working:'', improve:'', nextSteps:'', closing:''}
   ],
-  branding:{ agencyName:'EDITVIDEO.IO', logo:'', bg:'#8C1C1C', text:'#F5EEDF', tableBg:'#141414' }
+  branding:{ agencyName:'EDITVIDEO.IO', logo:'', bg:'#1B0E3D', text:'#F4F1FA', tableBg:'#120A28' }
 };
 
 // ---------------- Tabs ----------------
@@ -604,60 +642,200 @@ function render(){
 
 document.getElementById('exportBtn').addEventListener('click', ()=>window.print());
 
-// ---------------- Save & team access ----------------
-// NOTE FOR DEPLOYMENT: window.storage below is a Claude-artifact-only API.
-// It does NOT exist in a normal browser / standalone deployment.
-// If deploying outside claude.ai (Vercel, Netlify, etc.), this whole block
-// needs to be replaced with a real persistence layer (see README.md).
-document.getElementById('saveBtn').addEventListener('click', async ()=>{
+// ---------------- AI assist (Gemini via /api/ai-assist) ----------------
+async function callAiAssist(mode, payload){
+  const res = await fetch('/api/ai-assist', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({mode, payload})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  return data;
+}
+function setBtnLoading(btn, loading){ btn.classList.toggle('loading', loading); btn.disabled = loading; }
+
+// Improve this summary
+document.getElementById('improveSummaryBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('improveSummaryBtn');
+  const resultWrap = document.getElementById('summaryAiResult');
+  setBtnLoading(btn, true);
+  resultWrap.innerHTML = '';
+  try{
+    const data = await callAiAssist('improve-summary', {
+      client: state.cover.client, period: state.cover.period,
+      summary: state.summary, videos: state.videos
+    });
+    const improved = data.improved || data.raw || '';
+    if(!improved) throw new Error('No suggestion returned.');
+    resultWrap.innerHTML = `
+      <div class="ai-result">
+        <div class="field hint" style="margin-bottom:8px;">Suggested rewrite — edit freely, then apply:</div>
+        <textarea class="ai-draft" id="summaryAiDraft">${esc(improved)}</textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <button class="btn-ghost" id="useSummaryDraftBtn">Use this version</button>
+          <button class="btn-ghost danger" id="discardSummaryDraftBtn">Discard</button>
+        </div>
+      </div>`;
+    document.getElementById('useSummaryDraftBtn').addEventListener('click', ()=>{
+      const val = document.getElementById('summaryAiDraft').value;
+      state.summary = val;
+      document.getElementById('sm-text').value = val;
+      resultWrap.innerHTML = '';
+      render();
+    });
+    document.getElementById('discardSummaryDraftBtn').addEventListener('click', ()=>{ resultWrap.innerHTML=''; });
+  }catch(err){
+    resultWrap.innerHTML = `<div class="ai-result ai-err">${esc(err.message)}</div>`;
+  }finally{
+    setBtnLoading(btn, false);
+  }
+});
+
+// Suggest recommendations
+document.getElementById('suggestRecsBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('suggestRecsBtn');
+  const resultWrap = document.getElementById('recsAiResult');
+  setBtnLoading(btn, true);
+  resultWrap.innerHTML = '';
+  try{
+    const data = await callAiAssist('suggest-recommendations', {
+      client: state.cover.client, period: state.cover.period,
+      summary: state.summary, videos: state.videos,
+      notables: state.notables, existingRecs: state.recs
+    });
+    const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+    if(!recs.length) throw new Error('No recommendations returned.');
+    resultWrap.innerHTML = `
+      <div class="ai-result">
+        <div class="field hint" style="margin-bottom:8px;">Drafts — edit as needed, uncheck any you don't want:</div>
+        ${recs.map((r,i)=>`
+          <div class="ai-rec-item">
+            <input type="checkbox" id="aiRec${i}" checked>
+            <textarea id="aiRecText${i}">${esc(r)}</textarea>
+          </div>`).join('')}
+        <button class="btn-ghost" id="addRecsBtn" style="margin-top:4px;">Add checked to recommendations</button>
+      </div>`;
+    document.getElementById('addRecsBtn').addEventListener('click', ()=>{
+      const toAdd = recs.map((_,i)=>({
+        checked: document.getElementById(`aiRec${i}`).checked,
+        text: document.getElementById(`aiRecText${i}`).value.trim()
+      })).filter(r=>r.checked && r.text);
+      if(!toAdd.length) return;
+      const existing = document.getElementById('nt-recs').value;
+      const merged = (existing ? existing.replace(/\n+$/,'') + '\n' : '') + toAdd.map(r=>r.text).join('\n');
+      state.recs = merged;
+      document.getElementById('nt-recs').value = merged;
+      resultWrap.innerHTML = '';
+      render();
+    });
+  }catch(err){
+    resultWrap.innerHTML = `<div class="ai-result ai-err">${esc(err.message)}</div>`;
+  }finally{
+    setBtnLoading(btn, false);
+  }
+});
+
+// What am I missing?
+function analysisSummaryText(){
+  return state.analysis.map(a=>{
+    const bits = [];
+    if(!a.intro && !a.images.length) bits.push('no intro/images');
+    if(!linesOf(a.working).length) bits.push('no "what\'s working" content');
+    if(!linesOf(a.improve).length) bits.push('no "needs improvement" content');
+    if(!linesOf(a.nextSteps).length && !a.closing) bits.push('no next steps/closing');
+    return `${a.title || 'Untitled section'} (${bits.length ? bits.join(', ') : 'looks complete'})`;
+  }).join('; ') || '(no analysis sections)';
+}
+function structuralFlags(){
+  const flags = [];
+  if(!state.cover.client) flags.push('Client / channel name is empty.');
+  if(!state.summary || state.summary.trim().length < 40) flags.push('Executive summary is empty or very short.');
+  if(!state.videos.length) flags.push('No videos added to the top videos table.');
+  if(!state.notables || !linesOf(state.notables).length) flags.push('Other notables is empty.');
+  if(!state.recs || !linesOf(state.recs).length) flags.push('Recommendations list is empty.');
+  state.analysis.forEach(a=>{
+    if(!a.intro && !a.images.length && !linesOf(a.working).length && !linesOf(a.improve).length && !linesOf(a.nextSteps).length){
+      flags.push(`Analysis section "${a.title || 'Untitled'}" has no content yet.`);
+    }
+  });
+  return flags;
+}
+document.getElementById('missingBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('missingBtn');
+  const modal = document.getElementById('missingModal');
+  const body = document.getElementById('missingModalBody');
+  modal.classList.add('active');
+  setBtnLoading(btn, true);
+  const structural = structuralFlags();
+  body.innerHTML = `
+    ${structural.length ? `<ul class="ai-flags">${structural.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+    <p class="sub" style="margin:${structural.length?'12px':'0'} 0 0;">Checking for weak/generic content with AI…</p>`;
+  try{
+    const data = await callAiAssist('whats-missing', {
+      client: state.cover.client, title: state.cover.title, period: state.cover.period,
+      summary: state.summary, videoCount: state.videos.length,
+      notables: state.notables, recs: state.recs, closing: state.notablesClosing,
+      analysisSummary: analysisSummaryText()
+    });
+    const flags = Array.isArray(data.flags) ? data.flags : [];
+    const allFlags = [...structural, ...flags];
+    body.innerHTML = allFlags.length
+      ? `<ul class="ai-flags">${allFlags.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`
+      : '<p class="sub" style="margin:0;">Nothing obviously missing — looks solid.</p>';
+  }catch(err){
+    body.innerHTML = `
+      ${structural.length ? `<ul class="ai-flags">${structural.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>` : '<p class="sub" style="margin:0 0 12px;">No structural issues found.</p>'}
+      <div class="ai-result ai-err">AI check failed: ${esc(err.message)}</div>`;
+  }finally{
+    setBtnLoading(btn, false);
+  }
+});
+document.getElementById('missingModalClose').addEventListener('click', ()=>{
+  document.getElementById('missingModal').classList.remove('active');
+});
+document.getElementById('missingModal').addEventListener('click', e=>{
+  if(e.target.id === 'missingModal') e.currentTarget.classList.remove('active');
+});
+
+// ---------------- Save & team access (client-side JSON export/import) ----------------
+document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
   const status = document.getElementById('saveStatus');
   const key = slugify(document.getElementById('sv-key').value || state.cover.client);
   try{
-    await window.storage.set('report:'+key, JSON.stringify(state), true);
-    status.textContent = `Saved as "${key}". Anyone with the published link can load it from this tab.`;
-    refreshSavedList();
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${key}.report.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    status.textContent = `Exported "${key}.report.json". Share it via Drive/Dropbox/Slack for teammates to import.`;
   }catch(err){
-    status.textContent = 'Could not save — publish this artifact first (top-right of the artifact panel), then try again.';
+    status.textContent = 'Could not export the report file.';
   }
 });
-document.getElementById('refreshListBtn').addEventListener('click', refreshSavedList);
-
-async function refreshSavedList(){
-  const wrap = document.getElementById('savedList');
-  try{
-    const res = await window.storage.list('report:', true);
-    const keys = (res && res.keys) || [];
-    wrap.innerHTML = keys.length ? keys.map(k=>{
-      const label = k.replace(/^report:/,'');
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
-        <span style="font-size:12.5px;">${esc(label)}</span>
-        <span><button class="btn-ghost" data-act="load" data-key="${esc(k)}">Load</button>
-        <button class="btn-ghost danger" data-act="del" data-key="${esc(k)}" style="margin-left:6px;">Delete</button></span>
-      </div>`;
-    }).join('') : '<p class="sub" style="margin:0;">No saved reports yet.</p>';
-  }catch(err){
-    wrap.innerHTML = '<p class="sub" style="margin:0;">Saved reports will appear here once this app is published.</p>';
-  }
-}
-document.getElementById('savedList').addEventListener('click', async e=>{
-  const act = e.target.dataset.act, key = e.target.dataset.key;
-  if(!act) return;
-  if(act==='del'){
-    try{ await window.storage.delete(key, true); refreshSavedList(); }catch(err){}
-  }
-  if(act==='load'){
+document.getElementById('importJsonFile').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const status = document.getElementById('saveStatus');
+  const reader = new FileReader();
+  reader.onload = ()=>{
     try{
-      const res = await window.storage.get(key, true);
-      if(res && res.value){
-        const loaded = JSON.parse(res.value);
-        Object.assign(state, loaded);
-        hydrateForm();
-        document.getElementById('saveStatus').textContent = `Loaded "${key.replace(/^report:/,'')}".`;
-      }
+      const loaded = JSON.parse(reader.result);
+      Object.assign(state, loaded);
+      hydrateForm();
+      status.textContent = `Imported "${file.name}".`;
     }catch(err){
-      document.getElementById('saveStatus').textContent = 'Could not load that report.';
+      status.textContent = 'Could not import that file — is it a valid report .json?';
     }
-  }
+    e.target.value = '';
+  };
+  reader.onerror = ()=>{ status.textContent = 'Could not read that file.'; };
+  reader.readAsText(file);
 });
 
 function hydrateForm(){
@@ -671,12 +849,12 @@ function hydrateForm(){
   document.getElementById('nt-recs').value = state.recs||'';
   document.getElementById('nt-closing').value = state.notablesClosing||'';
   document.getElementById('bd-name').value = state.branding.agencyName||'';
-  document.getElementById('bd-bg').value = state.branding.bg||'#8C1C1C';
-  document.getElementById('bd-bg-hex').textContent = state.branding.bg||'#8C1C1C';
-  document.getElementById('bd-text').value = state.branding.text||'#F5EEDF';
-  document.getElementById('bd-text-hex').textContent = state.branding.text||'#F5EEDF';
-  document.getElementById('bd-table').value = state.branding.tableBg||'#141414';
-  document.getElementById('bd-table-hex').textContent = state.branding.tableBg||'#141414';
+  document.getElementById('bd-bg').value = state.branding.bg||'#1B0E3D';
+  document.getElementById('bd-bg-hex').textContent = state.branding.bg||'#1B0E3D';
+  document.getElementById('bd-text').value = state.branding.text||'#F4F1FA';
+  document.getElementById('bd-text-hex').textContent = state.branding.text||'#F4F1FA';
+  document.getElementById('bd-table').value = state.branding.tableBg||'#120A28';
+  document.getElementById('bd-table-hex').textContent = state.branding.tableBg||'#120A28';
   renderVideoTable();
   renderAnalysisPanel();
   render();
@@ -685,7 +863,6 @@ function hydrateForm(){
 // ---------------- init ----------------
 renderVideoTable();
 renderAnalysisPanel();
-refreshSavedList();
 render();
 </script>
 </body>

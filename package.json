@@ -1,0 +1,9 @@
+{
+  "name": "editvideo-io-channel-audit-report-builder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Internal channel audit report builder for EditVideo.io — static HTML app + one Vercel serverless function for Gemini AI-assist.",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
